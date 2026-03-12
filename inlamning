@@ -1,0 +1,145 @@
+-- ============================================================
+-- LOU'S PIZZA DATABASE
+-- ============================================================
+-- NOTE: Create the database "loupizzadb" manually first,
+-- then connect to it before running this script.
+-- ============================================================
+
+
+
+
+CREATE TABLE Kunder (
+KundID INT AUTO_INCREMENT PRIMARY KEY,
+    	Namn VARCHAR(100) NOT NULL,
+    	Email VARCHAR(255) UNIQUE NOT NULL,
+    	Telefon VARCHAR(30) NOT NULL,
+Adress VARCHAR(100) NOT NULL
+);
+
+
+
+CREATE TABLE Produkttyp (
+ProduktTypID INT PRIMARY KEY,
+ProduktTypNamn VARCHAR(100) NOT NULL
+);
+
+
+
+
+CREATE TABLE Produkter (
+ProduktID INT PRIMARY KEY,
+ 	ProduktTypID INT NOT NULL,
+ 	ProduktNamn VARCHAR(40) NOT NULL UNIQUE,
+ 	Pris DECIMAL(14,2) NOT NULL CHECK (Pris > 0),
+FOREIGN KEY (ProduktTypID) REFERENCES Produkttyp(ProduktTypID)
+);
+
+
+
+
+CREATE TABLE Bestallningar (
+OrderID BIGINT PRIMARY KEY,
+  	KundID INT NOT NULL,
+Totalbelopp DECIMAL(10,2) NOT NULL CHECK (Totalbelopp > 0),
+Datum TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+FOREIGN KEY (KundID) REFERENCES Kunder(KundID)  	
+);
+
+
+
+
+CREATE TABLE Orderrader (	
+OrderradID INT PRIMARY KEY,
+OrderID INT NOT NULL,
+ProduktID INT NOT NULL,
+	Antal INT NOT NULL CHECK (Antal > 0),
+ 	FOREIGN KEY (OrderID) REFERENCES Bestallningar(OrderID),
+	FOREIGN KEY (ProduktID) REFERENCES Produkter(ProduktID)
+);
+
+
+
+
+-- ==========================================================
+-- DATA INSERTION
+-- ==========================================================
+
+
+INSERT INTO TypeCategory (TypeCategoryID, TypeCategoryName) VALUES
+(1, 'Mat'),
+(2, 'Dryck & Tillbehör')
+ON CONFLICT (TypeCategoryID) DO NOTHING;
+
+
+INSERT INTO ProductType (ProduktTypID, TypeCategoryID, ProduktTypNamn) VALUES
+(1, 1, 'Pizza'),
+(3, 2, 'Läsk & Sås')
+ON CONFLICT (ProductTypeID) DO NOTHING;
+
+
+
+INSERT INTO Kunder (KundID, Namn, Email, Telefon, Adress)
+VALUES (1, 'Andersson')
+ON CONFLICT (CustomerID) DO NOTHING;
+
+
+INSERT INTO Produkter (ProduktTypID, ProduktNamn, Pris) VALUES
+(1, 'Vesuvio', 85.00),
+(1, 'Bussola', 90.00),
+(1, 'Banana', 95.00),
+(1, 'Tropical', 95.00),
+(1, 'Quattro Stagioni', 100.00),
+(2, 'Vitlökssås', 15.00),
+(2, 'Bearnaisesås', 15.00),
+(2, 'Coca Cola', 25.00),
+(2, 'Fanta', 25.00);
+
+
+INSERT INTO CustomerOrder (CustomerOrderID, EmployeeID, StoreID, CustomerID, OrderDate)
+VALUES (1001, 1, 1, 1, '2026-02-18')
+ON CONFLICT (CustomerOrderID) DO NOTHING;
+
+
+INSERT INTO Orderrader (CustomOrderItemID, CustomerOrderID, ProductID, Quantity)
+VALUES (1, 1001, 2, 2)
+ON CONFLICT (CustomOrderItemID) DO NOTHING;
+
+
+
+
+-- ==========================================================
+-- VY
+-- ==========================================================
+
+
+DROP VIEW IF EXISTS OrderSummaryView;
+
+
+CREATE VIEW OrdersammanFattning AS
+SELECT
+    co.CustomerOrderID AS ReceiptNo,
+    co.OrderDate,
+    s.StoreName,
+    e.FirstName || ' ' || e.LastName AS ServerBy,
+    c.LastName AS CustomerName,
+    JSON_AGG(JSON_BUILD_OBJECT('name', p.ProductName, 'price', p.Price, 'qty', coi.Quantity)) AS ItemList,
+    SUM(coi.Quantity * p.Price) AS FinalTotal
+FROM CustomerOrder co
+JOIN Store s ON co.StoreID = s.StoreID
+JOIN Employee e ON co.EmployeeID = e.EmployeeID
+JOIN Customer c ON co.CustomerID = c.CustomerID
+JOIN CustomOrderItem coi ON co.CustomerOrderID = coi.CustomerOrderID
+JOIN Product p ON coi.ProductID = p.ProductID
+GROUP BY co.CustomerOrderID, co.OrderDate, s.StoreName, e.FirstName, e.LastName, c.LastName;
+
+
+SELECT * FROM OrderSummaryView;
+
+
+
+
+
+
+
+
+

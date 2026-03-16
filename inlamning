@@ -45,6 +45,34 @@ CREATE TABLE Orderrader (
     FOREIGN KEY (ProduktID) REFERENCES Produkter(ProduktID)
 );
 
+CREATE OR REPLACE FUNCTION logga_ny_kund()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO Kundlogg (KundID)
+    VALUES (NEW.KundID);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_logga_ny_kund
+AFTER INSERT ON Kunder
+FOR EACH ROW
+EXECUTE FUNCTION logga_ny_kund();
+
+CREATE OR REPLACE FUNCTION logga_kund_uppdatering()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO Kundlogg (KundID)
+    VALUES (NEW.KundID);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_kund_uppdatering
+AFTER UPDATE ON Kunder
+FOR EACH ROW
+EXECUTE FUNCTION logga_kund_uppdatering();
+
 
 
 -- 2. Skapa funktionen som triggern ska använda
@@ -65,10 +93,7 @@ EXECUTE FUNCTION formatera_email();
 
 
 
-
--- ==========================================================
--- DATA INSERTION
--- ==========================================================
+-- Inserts av produkter, produkttyp och testkunder
 
 INSERT INTO Produkttyp (ProduktTypID, ProduktTypNamn) VALUES
 (1, 'Pizza'),

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alex&Benjis Pizzeria – Handgjorda Pizzor</title>
+  <meta name="description" content="Beställ handgjorda pizzor från Alex&Benjis Pizzeria. Färska ingredienser, snabb leverans!" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body data-show-page="{% if error_login %}login{% elif error_register %}register{% endif %}">
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar">
+    <div class="container navbar-inner">
+      <a href="/" class="navbar-brand">🍕 Alex&Benjis</a>
+      <div class="navbar-actions">
+        {% if session.get('kund_id') %}
+          <span class="btn-ghost hide-mobile">Hej, {{ session.namn }}!</span>
+          <a href="/logout" class="btn-ghost">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span class="hide-mobile">Logga ut</span>
+          </a>
+        {% else %}
+          <button class="btn-ghost" onclick="openModal('loginModal')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span class="hide-mobile">Logga in</span>
+          </button>
+        {% endif %}
+
+        <button class="btn-cart" onclick="openDrawer()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          <span class="hide-mobile">Varukorg</span>
+          <span class="cart-badge" id="cartBadge" style="display:none;">0</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== HERO ===== -->
+  <section class="hero">
+    <img src="{{ url_for('static', filename='images/hero-bg.jpg') }}" alt="Pizzeria" class="hero-bg" />
+    <div class="hero-overlay"></div>
+    <div class="hero-content animate-in">
+      <h1>Välkommen till vår Pizzeria</h1>
+      <p>Handgjorda pizzor med kärlek sedan 2026. Beställ direkt här!</p>
+    </div>
+  </section>
+
+  <!-- ===== DB ERROR ===== -->
+  {% if db_error %}
+  <div class="container" style="margin-top:2rem;">
+    <div class="error-msg">
+      <strong>Databasanslutning misslyckades:</strong> {{ db_error }}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ===== MENU ===== -->
+  <main class="container" style="padding-top:2.5rem; padding-bottom:5rem;">
+    <h2 class="section-title">Vår Meny</h2>
+    <div class="section-divider"></div>
+
+    <!-- Category Tabs -->
+    <div class="category-tabs">
+      {% for kategori in meny.keys() %}
+      <button class="tab-btn {% if loop.first %}active{% endif %}" data-category="{{ kategori }}" onclick="showCategory(this)">
+        {{ kategori }}
+      </button>
+      {% endfor %}
+    </div>
+
+    <!-- Menu Items per Category -->
+    {% for kategori, produkter in meny.items() %}
+    <div class="menu-category{% if not loop.first %} hidden{% endif %}" id="cat-{{ kategori }}">
+      <div class="menu-grid">
+        {% for p in produkter %}
+        <div class="menu-card animate-in" data-id="{{ p.produktid }}" data-name="{{ p.produktnamn }}" data-price="{{ p.pris }}">
+          <div class="menu-card-img-wrap">
+            <img src="{{ url_for('static', filename='images/' ~ p.produktnamn|lower|replace(' ', '-') ~ '.jpg') }}"
+                 alt="{{ p.produktnamn }}" class="menu-card-img" loading="lazy"
+                 data-default-src="{{ url_for('static', filename='images/default.jpg') }}" />
+          </div>
+          <div class="menu-card-body">
+            <div class="menu-card-header">
+              <div>
+                <h3 class="menu-card-name">{{ p.produktnamn }}</h3>
+                <p class="menu-card-desc">{{ p.beskrivning or '' }}</p>
+              </div>
+              <span class="menu-card-price">{{ p.pris|int }} kr</span>
+            </div>
+            <div class="menu-card-actions">
+              <div class="qty-group" id="qty-{{ p.produktid }}" style="display:none;" data-id="{{ p.produktid }}">
+                <button class="qty-btn" onclick="changeQty(this.closest('.menu-card').dataset.id, -1)">−</button>
+                <span class="qty-value" id="qtyVal-{{ p.produktid }}">0</span>
+                <button class="qty-btn primary" onclick="changeQty(this.closest('.menu-card').dataset.id, 1)">+</button>
+              </div>
+              <button class="btn-add" id="addBtn-{{ p.produktid }}" onclick="changeQty(this.closest('.menu-card').dataset.id, 1)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Lägg till
+              </button>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </main>
+
+  <!-- ===== CART DRAWER ===== -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="cartDrawer">
+    <div class="drawer-header">
+      <h2>Din varukorg</h2>
+      <button class="drawer-close" onclick="closeDrawer()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="drawer-body" id="cartBody">
+      <div class="drawer-empty">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <p>Varukorgen är tom</p>
+      </div>
+    </div>
+    <div class="drawer-footer" id="cartFooter" style="display:none;">
+      <div class="drawer-total">
+        <span>Totalt</span>
+        <span id="cartTotal">0 kr</span>
+      </div>
+      <form method="POST" action="/order">
+        <input type="hidden" name="cart_data" id="cartDataInput" />
+        <button type="submit" class="btn-order" onclick="prepareOrder()">Skicka beställning</button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- ===== LOGIN MODAL ===== -->
+  <div class="modal-overlay" id="loginModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🍕 Logga in</h2>
+        <button class="drawer-close" onclick="closeModal('loginModal')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <p class="auth-subtitle">Välkommen tillbaka till Alex&Benjis Pizzeria</p>
+      {% if error_login %}
+        <div class="error-msg">{{ error_login }}</div>
+      {% endif %}
+      <form method="POST" action="/login">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <div class="input-wrap">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            <input type="email" name="email" class="form-input" placeholder="din@email.com" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Lösenord</label>
+          <div class="input-wrap">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" name="losenord" class="form-input" placeholder="••••••••" required />
+          </div>
+        </div>
+        <button type="submit" class="btn-submit">Logga in</button>
+      </form>
+      <p class="auth-footer">
+        Inget konto?
+        <button onclick="closeModal('loginModal'); openModal('registerModal');">Skapa konto</button>
+      </p>
+    </div>
+  </div>
+
+  <!-- ===== REGISTER MODAL ===== -->
+  <div class="modal-overlay" id="registerModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🍕 Skapa konto</h2>
+        <button class="drawer-close" onclick="closeModal('registerModal')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <p class="auth-subtitle">Bli en del av Alex&Benjis Pizzeria</p>
+      {% if error_register %}
+        <div class="error-msg">{{ error_register }}</div>
+      {% endif %}
+      <form method="POST" action="/register">
+        <div class="form-group">
+          <label class="form-label">Namn</label>
+          <div class="input-wrap">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input type="text" name="namn" class="form-input" placeholder="Ditt namn" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <div class="input-wrap">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            <input type="email" name="email" class="form-input" placeholder="din@email.com" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefon</label>
+          <div class="input-wrap">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            <input type="tel" name="telefon" class="form-input" placeholder="070-123 45 67" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Adress</label>
+          <div class="input-wrap">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            <input type="text" name="adress" class="form-input" placeholder="Din leveransadress" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Lösenord</label>
+          <div class="input-wrap">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" name="losenord" class="form-input" placeholder="••••••••" required />
+          </div>
+        </div>
+        <button type="submit" class="btn-submit">Skapa konto</button>
+      </form>
+      <p class="auth-footer">
+        Har du redan konto?
+        <button onclick="closeModal('registerModal'); openModal('loginModal');">Logga in</button>
+      </p>
+    </div>
+  </div>
+
+  <!-- ===== RECEIPT MODAL ===== -->
+  {% if receipt %}
+  <div class="modal-overlay open" id="receiptModal">
+    <div class="modal-content">
+      <div class="receipt-edge">
+        <div class="receipt-body">
+          <div class="receipt">
+            <h2 class="receipt-title">Alex&Benjis Pizzeria</h2>
+            <p class="receipt-meta">Kvitto #{{ receipt.receiptno }}</p>
+            <p class="receipt-meta">Datum: {{ receipt.orderdate }}</p>
+            <p class="receipt-meta">Kund: {{ receipt.customername }}</p>
+
+            <hr class="receipt-divider" />
+
+            <div class="receipt-items">
+              {% for item in receipt.itemlist %}
+              <div class="receipt-row">
+                <span>{{ item.qty }}x {{ item.name }}</span>
+                <span>{{ (item.price * item.qty)|int }} kr</span>
+              </div>
+              {% endfor %}
+            </div>
+
+            <hr class="receipt-divider" />
+
+            <div class="receipt-total">
+              <span>TOTALT:</span>
+              <span>{{ receipt.finaltotal|int }} kr</span>
+            </div>
+
+            <p class="receipt-thanks">Tack för din beställning! 🍕</p>
+            <p class="receipt-barcode">||| |||| || |||</p>
+          </div>
+
+          <button class="btn-close-receipt" onclick="closeModal('receiptModal')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Stäng
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+
+  <!-- ===== JAVASCRIPT ===== -->
+  <script>
+    // Cart state: { id: { name, price, qty, image } }
+    const cart = {};
+
+    // === Category Tabs ===
+    function showCategory(btn) {
+      const name = btn.dataset.category;
+      if (!name) return;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.menu-category').forEach(c => c.classList.add('hidden'));
+      const el = document.getElementById('cat-' + name);
+      if (el) el.classList.remove('hidden');
+    }
+
+    // === Quantity ===
+    function changeQty(id, delta) {
+      const card = document.querySelector(`[data-id="${id}"]`);
+      const name = card.dataset.name;
+      const price = parseFloat(card.dataset.price);
+      const img = card.querySelector('.menu-card-img')?.src || '';
+
+      if (!cart[id]) cart[id] = { name, price, qty: 0, image: img };
+      cart[id].qty = Math.max(0, cart[id].qty + delta);
+      if (cart[id].qty === 0) delete cart[id];
+
+      updateCardUI(id);
+      updateCartBadge();
+      renderDrawer();
+    }
+
+    function updateCardUI(id) {
+      const qty = cart[id]?.qty || 0;
+      const qtyGroup = document.getElementById('qty-' + id);
+      const addBtn = document.getElementById('addBtn-' + id);
+      const qtyVal = document.getElementById('qtyVal-' + id);
+
+      if (qty > 0) {
+        qtyGroup.style.display = 'flex';
+        addBtn.style.display = 'none';
+        qtyVal.textContent = qty;
+      } else {
+        qtyGroup.style.display = 'none';
+        addBtn.style.display = 'flex';
+      }
+    }
+
+    function updateCartBadge() {
+      const total = Object.values(cart).reduce((s, i) => s + i.qty, 0);
+      const badge = document.getElementById('cartBadge');
+      if (total > 0) {
+        badge.style.display = 'flex';
+        badge.textContent = total;
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    // === Drawer ===
+    function openDrawer() {
+      document.getElementById('drawerOverlay').classList.add('open');
+      document.getElementById('cartDrawer').classList.add('open');
+    }
+    function closeDrawer() {
+      document.getElementById('drawerOverlay').classList.remove('open');
+      document.getElementById('cartDrawer').classList.remove('open');
+    }
+
+    function renderDrawer() {
+      const body = document.getElementById('cartBody');
+      const footer = document.getElementById('cartFooter');
+      const items = Object.entries(cart);
+
+      if (items.length === 0) {
+        body.innerHTML = `
+          <div class="drawer-empty">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            <p>Varukorgen är tom</p>
+          </div>`;
+        footer.style.display = 'none';
+        return;
+      }
+
+      let total = 0;
+      body.innerHTML = items.map(([id, item]) => {
+        total += item.price * item.qty;
+        return `
+          <div class="cart-item">
+            <img src="${item.image}" alt="${item.name}" />
+            <div class="cart-item-info">
+              <p>${item.name}</p>
+              <p>${item.price} kr</p>
+            </div>
+            <div class="cart-item-qty">
+              <button onclick="changeQty(${id}, -1)">−</button>
+              <span>${item.qty}</span>
+              <button class="primary" onclick="changeQty(${id}, 1)">+</button>
+            </div>
+          </div>`;
+      }).join('');
+
+      document.getElementById('cartTotal').textContent = total + ' kr';
+      footer.style.display = '';
+    }
+
+    function prepareOrder() {
+      document.getElementById('cartDataInput').value = JSON.stringify(cart);
+    }
+
+    // === Modals ===
+    function openModal(id) {
+      document.getElementById(id).classList.add('open');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+    }
+
+    // Open login/register modal automatically if server indicated an error
+    document.addEventListener('DOMContentLoaded', () => {
+      const auto = document.body.dataset.showPage;
+      if (auto === 'login') openModal('loginModal');
+      if (auto === 'register') openModal('registerModal');
+
+      // Ensure broken product images fall back to default placeholder
+      document.querySelectorAll('img[data-default-src]').forEach(img => {
+        img.onerror = () => { img.src = img.dataset.defaultSrc; };
+      });
+    });
+  </script>
+
+</body>
+</html>

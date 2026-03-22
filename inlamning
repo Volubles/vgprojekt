@@ -1,59 +1,114 @@
-CREATE TABLE Kunder (
+-- Alex&Benjis Pizzeria 
+-- Slutprojekt i Databaser
+-- PostgreSQL-schema, testdata, trigger, procedure, view och roller
+-- av Alexander Johansson och Benjamin Kullman YH25
+
+
+
+-- Tabellerna för vår relationsdatabas
+CREATE TABLE IF NOT EXISTS Kunder (
     KundID SERIAL PRIMARY KEY,
     Namn VARCHAR(100) NOT NULL,
     Email VARCHAR(255) UNIQUE NOT NULL,
-    Telefon VARCHAR(30) NOT NULL,
-    Adress VARCHAR(100) NOT NULL,
-	Losenord VARCHAR(100) NOT NULL
+    Telefon VARCHAR(30),
+    Adress VARCHAR(255),
+    Losenord VARCHAR(255) NOT NULL,
+    SkapadDatum TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE Kundlogg (
-    LoggID INT AUTO_INCREMENT PRIMARY KEY,
-    KundID INT, 
-    Handelse VARCHAR(255),
-    Loggdatum TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (KundID) REFERENCES Kunder(KundID) ON DELETE SET NULL
+CREATE TABLE IF NOT EXISTS Kundlogg (
+    LoggID SERIAL PRIMARY KEY,
+    KundID INT REFERENCES Kunder(KundID) ON DELETE SET NULL,
+    Handelse VARCHAR(255) NOT NULL,
+    Loggdatum TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE Produkttyp (
+CREATE TABLE IF NOT EXISTS Produkttyp (
     ProduktTypID INT PRIMARY KEY,
-    ProduktTypNamn VARCHAR(100) NOT NULL
+    ProduktTypNamn VARCHAR(100) NOT NULL UNIQUE
 );
 
-CREATE TABLE Produkter (
-    ProduktID SERIAL PRIMARY KEY, -- Tillagd AUTO_INCREMENT
-    ProduktTypID INT NOT NULL,
-    ProduktNamn VARCHAR(40) NOT NULL UNIQUE,
-    Pris DECIMAL(14,2) NOT NULL CHECK (Pris > 0),
-    FOREIGN KEY (ProduktTypID) REFERENCES Produkttyp(ProduktTypID)
+CREATE TABLE IF NOT EXISTS Produkter (
+    ProduktID SERIAL PRIMARY KEY,
+    ProduktTypID INT NOT NULL REFERENCES Produkttyp(ProduktTypID),
+    ProduktNamn VARCHAR(60) NOT NULL UNIQUE,
+    Pris NUMERIC(14, 2) NOT NULL CHECK (Pris > 0),
+    Beskrivning TEXT NOT NULL DEFAULT '',
+    LagerSaldo INT NOT NULL DEFAULT 0 CHECK (LagerSaldo >= 0)
 );
 
-CREATE TABLE Bestallningar (
+CREATE TABLE IF NOT EXISTS Bestallningar (
     OrderID INT PRIMARY KEY,
-    KundID INT NOT NULL,
-    Totalbelopp DECIMAL(10,2) NOT NULL CHECK (Totalbelopp > 0),
+    KundID INT NOT NULL REFERENCES Kunder(KundID),
+    Totalbelopp NUMERIC(10, 2) NOT NULL CHECK (Totalbelopp > 0),
     Datum TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (KundID) REFERENCES Kunder(KundID)
+    Leveransadress VARCHAR(255)
 );
 
-CREATE TABLE Orderrader (
-    OrderradID SERIAL PRIMARY KEY, -- Tillagd AUTO_INCREMENT
-    OrderID INT NOT NULL,
-    ProduktID INT NOT NULL,
-    Antal INT NOT NULL CHECK (Antal > 0),
-    FOREIGN KEY (OrderID) REFERENCES Bestallningar(OrderID),
-    FOREIGN KEY (ProduktID) REFERENCES Produkter(ProduktID)
+CREATE TABLE IF NOT EXISTS Orderrader (
+    OrderradID SERIAL PRIMARY KEY,
+    OrderID INT NOT NULL REFERENCES Bestallningar(OrderID),
+    ProduktID INT NOT NULL REFERENCES Produkter(ProduktID),
+    Antal INT NOT NULL CHECK (Antal > 0)
 );
 
-CREATE OR REPLACE FUNCTION logga_ny_kund()
+CREATE TABLE IF NOT EXISTS Anstallda (
+    AnstalldID SERIAL PRIMARY KEY,
+    Anvandarnamn VARCHAR(50) NOT NULL UNIQUE,
+    Namn VARCHAR(100) NOT NULL,
+    Email VARCHAR(255) NOT NULL UNIQUE,
+    Telefon VARCHAR(30),
+    Roll VARCHAR(20) NOT NULL DEFAULT 'anstalld' CHECK (Roll IN ('admin', 'anstalld')),
+    Losenord VARCHAR(255) NOT NULL,
+    Aktiv BOOLEAN NOT NULL DEFAULT TRUE,
+    SkapadAv INT REFERENCES Anstallda(AnstalldID) ON DELETE SET NULL,
+    SkapadDatum TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UppdateradDatum TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+-- Våra indexeringar
+CREATE INDEX IF NOT EXISTS idx_bestallningar_kundid ON Bestallningar (KundID);
+CREATE INDEX IF NOT EXISTS idx_bestallningar_datum ON Bestallningar (Datum);
+CREATE INDEX IF NOT EXISTS idx_orderrader_orderid ON Orderrader (OrderID);
+CREATE INDEX IF NOT EXISTS idx_produkter_typ ON Produkter (ProduktTypID);
+
+
+
+-- Triggers & funktioner
+CREATE OR REPLACE FUNCTION uppdatera_lager_vid_order()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO Kundlogg (KundID)
-    VALUES (NEW.KundID);
+    UPDATE Produkter
+    SET LagerSaldo = LagerSaldo - NEW.Antal
+    WHERE ProduktID = NEW.ProduktID
+      AND LagerSaldo >= NEW.Antal;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Otillrackligt lager for produkt %', NEW.ProduktID;
+    END IF;
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_uppdatera_lager ON Orderrader;
+CREATE TRIGGER trigger_uppdatera_lager
+AFTER INSERT ON Orderrader
+FOR EACH ROW
+EXECUTE FUNCTION uppdatera_lager_vid_order();
+
+CREATE OR REPLACE FUNCTION logga_ny_kund()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO Kundlogg (KundID, Handelse)
+    VALUES (NEW.KundID, 'Ny kund registrerad');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_logga_ny_kund ON Kunder;
 CREATE TRIGGER trigger_logga_ny_kund
 AFTER INSERT ON Kunder
 FOR EACH ROW
@@ -62,90 +117,211 @@ EXECUTE FUNCTION logga_ny_kund();
 CREATE OR REPLACE FUNCTION logga_kund_uppdatering()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO Kundlogg (KundID)
-    VALUES (NEW.KundID);
+    INSERT INTO Kundlogg (KundID, Handelse)
+    VALUES (NEW.KundID, 'Kundprofil uppdaterad');
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_kund_uppdatering ON Kunder;
 CREATE TRIGGER trigger_kund_uppdatering
 AFTER UPDATE ON Kunder
 FOR EACH ROW
 EXECUTE FUNCTION logga_kund_uppdatering();
 
-
-
--- 2. Skapa funktionen som triggern ska använda
 CREATE OR REPLACE FUNCTION formatera_email()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Ändrar e-postadressen till små bokstäver
     NEW.Email = LOWER(NEW.Email);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- 3. Skapa triggern som kör funktionen innan varje ny kund eller uppdatering
-CREATE TRIGGER trigger_formatera_email
+DROP TRIGGER IF EXISTS trigger_formatera_kund_email ON Kunder;
+CREATE TRIGGER trigger_formatera_kund_email
 BEFORE INSERT OR UPDATE ON Kunder
 FOR EACH ROW
 EXECUTE FUNCTION formatera_email();
 
+DROP TRIGGER IF EXISTS trigger_formatera_anstalld_email ON Anstallda;
+CREATE TRIGGER trigger_formatera_anstalld_email
+BEFORE INSERT OR UPDATE ON Anstallda
+FOR EACH ROW
+EXECUTE FUNCTION formatera_email();
+
+CREATE OR REPLACE FUNCTION uppdatera_anstalld_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.UppdateradDatum = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_anstalld_timestamp ON Anstallda;
+CREATE TRIGGER trigger_anstalld_timestamp
+BEFORE UPDATE ON Anstallda
+FOR EACH ROW
+EXECUTE FUNCTION uppdatera_anstalld_timestamp();
 
 
--- Inserts av produkter, produkttyp och testkunder
 
+-- För att få fram ett kvitto på hemsidan så kör man den här frågan
+CREATE OR REPLACE VIEW OrdersammanFattning AS
+SELECT
+    b.OrderID AS KvittoNummer,
+    b.Datum AS OrderDatum,
+    k.Namn AS KundNamn,
+    p.ProduktNamn AS ProduktNamn,
+    o.Antal AS Antal,
+    p.Pris AS Pris,
+    (o.Antal * p.Pris) AS RadSumma,
+    b.Totalbelopp AS TotalBelopp
+FROM Bestallningar b
+JOIN Kunder k ON b.KundID = k.KundID
+JOIN Orderrader o ON b.OrderID = o.OrderID
+JOIN Produkter p ON o.ProduktID = p.ProduktID;
+
+
+
+-- Stored Procedure på att beräkna totalförsäljning mellan två datum
+CREATE OR REPLACE PROCEDURE BeraknaTotalForsaljning(
+    IN start_datum DATE,
+    IN slut_datum DATE
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    total NUMERIC(14, 2);
+BEGIN
+    SELECT COALESCE(SUM(Totalbelopp), 0)
+    INTO total
+    FROM Bestallningar
+    WHERE Datum::DATE BETWEEN start_datum AND slut_datum;
+
+    RAISE NOTICE 'Total forsaljning mellan % och % ar % kr', start_datum, slut_datum, total;
+END;
+$$;
+
+
+
+-- Testdata till de olika tabellerna.
 INSERT INTO Produkttyp (ProduktTypID, ProduktTypNamn) VALUES
-(1, 'Pizza'),
-(2, 'Läsk & Sås') -- Ändrat ID från 3 till 2 för att matcha produkterna
-ON CONFLICT (ProduktTypID) DO NOTHING; -- Rättat kolumnnamn från ProductTypeID
+    (1, 'Pizza'),
+    (2, 'Läsk & sås')
+ON CONFLICT (ProduktTypID) DO NOTHING;
 
+INSERT INTO Produkter (ProduktTypID, ProduktNamn, Pris, Beskrivning, LagerSaldo) VALUES
+    (1, 'Vesuvio', 85.00, 'Tomatsas, ost och skinka. En klassisk favorit for den som vill ha det enkelt och gott.', 100),
+    (1, 'Bussola', 90.00, 'Tomatsas, ost, skinka och rakor. En mild pizza med lite extra lyx.', 100),
+    (1, 'Banana', 95.00, 'Tomatsas, ost, skinka, banan och curry. Sotma och krydda i samma pizza.', 100),
+    (1, 'Tropical', 95.00, 'Tomatsas, ost, skinka och ananas. Frisk, sot och fortfarande klassiskt pizzeria.', 100),
+    (1, 'Quattro Stagioni', 100.00, 'Fyra smaker pa samma pizza med skinka, champinjoner, rakor och musslor.', 100),
+    (2, 'Vitlokssås', 15.00, 'Krämig vitlokssås som passar till pizza, pommes och sallad.', 100),
+    (2, 'Bearnaisesås', 15.00, 'Klassisk bea med tydlig dragon och krämig konsistens.', 100),
+    (2, 'Coca Cola', 25.00, 'Kall 33 cl lask som passar till hela menyn.', 100),
+    (2, 'Fanta', 25.00, 'Apelsinlask 33 cl for den som vill ha nagot fruktigare.', 100)
+ON CONFLICT (ProduktNamn) DO NOTHING;
 
 INSERT INTO Kunder (KundID, Namn, Email, Telefon, Adress, Losenord) VALUES
-(1, 'Alexander', 'alextest@test.com', '0769490342', 'Svantevägen 28', 'jado123'), -- 
-(2, 'Benjamin', 'tester@test.com', '070077077', 'Vantevägen 27', 'jado123')       --
-ON CONFLICT (KundID) DO NOTHING; -- 
+    (1, 'Alexander', 'alextest@test.com', '0769490342', 'Svantevagen 28', 'scrypt:32768:8:1$pKtvtuB0cTpQGkNe$e99526752a2658e83c31b90e736138a54000ffb12a8085b81693e83a15454198e0c33f97739077a1020fda3d7b2eb7d090497cbfa878f4b457fa73f8522d75c2'),
+    (2, 'Benjamin', 'tester@test.com', '070077077', 'Vantevagen 27', 'scrypt:32768:8:1$pKtvtuB0cTpQGkNe$e99526752a2658e83c31b90e736138a54000ffb12a8085b81693e83a15454198e0c33f97739077a1020fda3d7b2eb7d090497cbfa878f4b457fa73f8522d75c2')
+ON CONFLICT (KundID) DO NOTHING;
 
-DELETE FROM Kunder WHERE Email IN ('alextest@test.com', 'tester@test.com');
+INSERT INTO Anstallda (AnstalldID, Anvandarnamn, Namn, Email, Telefon, Roll, Losenord, Aktiv) VALUES
+    (1, 'admin', 'Huvudadministrator', 'admin@alexbenjis.local', '0700000001', 'admin', 'scrypt:32768:8:1$XuipPBsJQJZpEiJ1$194df01653774584e65828b784d7cd5e3a0e6b45e3395d025e8c017bb0c9c38cd1e4b5292b9f3212ec1c2cee3a31abd0b3bf347cd9bff674261d76ed211ccb34', TRUE),
+    (2, 'personal', 'Exempelanstalld', 'personal@alexbenjis.local', '0700000002', 'anstalld', 'scrypt:32768:8:1$s9ewKkAshF2lJxAp$a9c3c395b6751536e2ba5ed36698ca7aa74b3acc11ec10fa79236e297d0cf004de8f92ce931481006aed8d9f489abe2c33a3adab8403c506efa4f44f3e44148e', TRUE)
+ON CONFLICT (AnstalldID) DO NOTHING;
 
--- ProduktID utelämnas i VALUES eftersom den nu har AUTO_INCREMENT
-INSERT INTO Produkter (ProduktTypID, ProduktNamn, Pris) VALUES
-(1, 'Vesuvio', 85.00),
-(1, 'Bussola', 90.00),
-(1, 'Banana', 95.00),
-(1, 'Tropical', 95.00),
-(1, 'Quattro Stagioni', 100.00),
-(2, 'Vitlökssås', 15.00),	
-(2, 'Bearnaisesås', 15.00),
-(2, 'Coca Cola', 25.00),
-(2, 'Fanta', 25.00);
+INSERT INTO Bestallningar (OrderID, KundID, Totalbelopp, Datum, Leveransadress) VALUES
+    (1001, 1, 180.00, '2026-03-10 18:30:00', 'Svantevagen 28'),
+    (1002, 2, 95.00, '2026-03-11 19:00:00', 'Vantevagen 27')
+ON CONFLICT (OrderID) DO NOTHING;
 
-INSERT INTO Bestallningar (OrderID, KundID, Totalbelopp, Datum) VALUES
-(1001, 1, 170.00, '2026-02-18'), -- Rättat antal värden (tog bort en överflödig 1:a) och lagt till kommatecken
-(1002, 2, 95.00, '2026-02-18')
-ON CONFLICT (OrderID) DO NOTHING; -- Rättat kolumnnamn från CustomerOrderID
+INSERT INTO Orderrader (OrderID, ProduktID, Antal)
+SELECT 1001, p.ProduktID, 2
+FROM Produkter p
+WHERE p.ProduktNamn = 'Bussola'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM Orderrader o
+      WHERE o.OrderID = 1001
+        AND o.ProduktID = p.ProduktID
+  );
 
-INSERT INTO Orderrader (OrderID, ProduktID, Antal) VALUES
-(1001, 2, 2) -- Rättat kolumn till ProduktID (inte ProduktTypID) och tagit bort dubbla VALUES
-ON CONFLICT (OrderradID) DO NOTHING; -- Rättat kolumnnamn från CustomOrderItemID
+INSERT INTO Orderrader (OrderID, ProduktID, Antal)
+SELECT 1002, p.ProduktID, 1
+FROM Produkter p
+WHERE p.ProduktNamn = 'Tropical'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM Orderrader o
+      WHERE o.OrderID = 1002
+        AND o.ProduktID = p.ProduktID
+  );
 
 
--- VY FÖR ORDERSAMMANFATTNING (KVITTO)
-DROP VIEW IF EXISTS OrdersammanFattning;
+-- Roller & Behörigheter
+-- OBS: Kräver att den som kör skriptet får skapa roller
 
-CREATE VIEW OrdersammanFattning AS
-SELECT 
-    Bestallningar.OrderID               AS KvittoNummer,
-    Bestallningar.Datum                 AS OrderDatum,
-    Kunder.Namn                         AS KundNamn,
-    Produkter.ProduktNamn               AS ProduktNamn,
-    Orderrader.Antal                    AS Antal,
-    Produkter.Pris                      AS Pris,
-    (Orderrader.Antal * Produkter.Pris) AS RadSumma,
-    Bestallningar.Totalbelopp           AS TotalBelopp
-FROM Bestallningar
-JOIN Kunder     ON Bestallningar.KundID  = Kunder.KundID
-JOIN Orderrader ON Bestallningar.OrderID = Orderrader.OrderID
-JOIN Produkter  ON Orderrader.ProduktID  = Produkter.ProduktID;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pizzeria_admin') THEN
+        CREATE ROLE pizzeria_admin;
+    END IF;
 
-SELECT * FROM Kunder;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pizzeria_anstalld') THEN
+        CREATE ROLE pizzeria_anstalld;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pizzeria_las') THEN
+        CREATE ROLE pizzeria_las;
+    END IF;
+END;
+$$;
+
+
+-- Våra RBAC (Role Based Access Control) alltså vilka roller som har rätt till vilken data i databasen. Exempelvis att anställda ska enbart kunna uppdatera produktinformation men inte kunduppgifter.
+GRANT USAGE ON SCHEMA public TO pizzeria_admin, pizzeria_anstalld, pizzeria_las;
+
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO pizzeria_las;
+
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO pizzeria_anstalld;
+GRANT UPDATE (Beskrivning) ON Produkter TO pizzeria_anstalld;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO pizzeria_admin;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO pizzeria_admin;
+
+REVOKE UPDATE, DELETE ON Produkter FROM PUBLIC;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO pizzeria_las;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO pizzeria_anstalld;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO pizzeria_admin;
+
+
+
+-- Exempel på frågor
+-- JOIN + GROUP BY för att få fram totalförsäljning per produkttyp.
+SELECT pt.ProduktTypNamn, SUM(o.Antal * p.Pris) AS total_forsaljning
+FROM Orderrader o
+JOIN Produkter p ON o.ProduktID = p.ProduktID
+JOIN Produkttyp pt ON p.ProduktTypID = pt.ProduktTypID
+GROUP BY pt.ProduktTypNamn
+ORDER BY total_forsaljning DESC;
+
+
+
+-- JOIN + GROUP BY för att få kunder baserat på antal ordrar.
+SELECT k.Namn, COUNT(b.OrderID) AS antal_orders, SUM(b.Totalbelopp) AS totalt_spenderat
+FROM Kunder k
+JOIN Bestallningar b ON k.KundID = b.KundID
+GROUP BY k.Namn
+ORDER BY totalt_spenderat DESC;
+
+
+
+-- Vi har valt designa vår relationsdatabas så här just för att få en "smart" databas där vi har indexeringar, joins, group by
+-- samt GRANT och REVOKE för att säkerställa att användarkonton har rätt behörigheter satta. 
+-- Vi har även en del triggers i vår databas, för att vara mer specifik rör det sig om triggers på lagersaldo, uppdatering av nya kunder
+-- samt uppdateraing av kunduppgifter. Vidare så har vi även triggers på formatering av email från CAPS till lowercase och timestamp på 
+-- anställda så att den anställde som uppdaterar någon beskrivning på pizza får en loggning med tidsstämpel.
+

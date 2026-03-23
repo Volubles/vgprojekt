@@ -1,5 +1,5 @@
 # Alex&Benjis Pizzeria
-av AlexanderJohansson och Benjamin Kullman YH25 VG Projekt
+av Alexander Johansson och Benjamin Kullman YH25 VG Projekt
 
 ## Projektoversikt
 

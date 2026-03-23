@@ -162,3 +162,8 @@ Det viktigaste designvalet i projektet är att separera kundkonton och personalr
 Det gör datamodellen tydligare och gör det enkelt att visa olika privilegier i presentationen.
 Vad man hade kunnat implementera för en mer komplett webbapplikation är att ha en egen mailserver och en "Glömt lösenord?" funktion.
 Avslutningsvis så finns det definitivt mer UX-designval man kan se över.
+
+## ER-diagram.
+Så här ser vårat ER-diagram ut till projektet:
+
+![ER-diagram](images/ER-diagram-Alex&Benjis.png)

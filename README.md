@@ -166,4 +166,4 @@ Avslutningsvis så finns det definitivt mer UX-designval man kan se över.
 ## ER-diagram.
 Så här ser vårat ER-diagram ut till projektet:
 
-![ER-diagram](images/ER-diagram-Alex&Benjis.png)
+![ER-diagram](images/er-diagram.png)

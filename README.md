@@ -160,5 +160,5 @@ python app.py
 
 Det viktigaste designvalet i projektet är att separera kundkonton och personalroller i olika tabeller.
 Det gör datamodellen tydligare och gör det enkelt att visa olika privilegier i presentationen.
-Vad man hade kunnat implementera för en mer komplett är att ha en egen mailserver och en "Glömt lösenord?" funktion
-Till sist så finns det definitivt mer UX-designval man kan se över.
+Vad man hade kunnat implementera för en mer komplett webbapplikation är att ha en egen mailserver och en "Glömt lösenord?" funktion.
+Avslutningsvis så finns det definitivt mer UX-designval man kan se över.

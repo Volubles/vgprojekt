@@ -11,7 +11,7 @@ Den senaste versionen av databasen innehåller tre tydliga användarflöden:
 
 - `/` = för kunder som vill se menyn, registrera konto, logga in och lägga beställningar.
 - `/anstallda` = för personal som bara får uppdatera pizzornas beskrivningar.
-- `/admin`= för administratorer som får full tillgång till konton, sortiment och databassammanstallningar.
+- `/admin`= för administratörer som får full tillgång till konton, sortiment och databassammanstallningar.
 
 ## Funktioner i projektet
 
@@ -36,7 +36,7 @@ Den senaste versionen av databasen innehåller tre tydliga användarflöden:
 - Admin kan uppdatera användarnamn, namn, email, telefon, roll och aktiv-status.
 - Admin kan resetta lösenord genom att skriva ett nytt lösenord på valfritt konto.
 - Admin kan uppdatera full produktinformation: namn, pris, lager, produkttyp och beskrivning.
-- Adminpanelen visar dessutom kunder, bestallningar, orderrader, kundlogg och databassyn.
+- Adminpanelen visar dessutom kunder, beställningar, orderrader, kundlogg och databassyn.
 
 ## Databasstruktur
 
@@ -48,7 +48,7 @@ Lagrar kundkonton som kan registrera sig, logga in och beställa.
 
 ### `Produkttyp`
 
-Används for att dela upp sortimentet i kategorier, till exempel `Pizza` och `Läsk & Sås`.
+Används för att dela upp sortimentet i kategorier, till exempel `Pizza` och `Läsk & Sås`.
 
 ### `Produkter`
 
@@ -76,7 +76,7 @@ Har finns användarnamn, kontaktuppgifter, roll, lösenordshash och aktiv-status
 
 ### Trigger
 
-Projektet innehaller flera triggers:
+Projektet innehåller flera triggers:
 
 - `trigger_uppdatera_lager` minskar lagersaldo nar en ny orderrad skapas.
 - `trigger_logga_ny_kund` loggar nya kundkonton.
@@ -119,7 +119,7 @@ I `inlamning.sql` finns rollerna:
 
 - `pizzeria_admin` med full behörighet på tabellerna.
 - `pizzeria_anstalld` med begränsad behörighet, mer specifikt `SELECT` på tabellerna och `UPDATE(Beskrivning)` på `Produkter`.
-- `pizzeria_las` med läsbehorighet för rapportering till databasen.
+- `pizzeria_las` med läsbehörighet för rapportering till databasen.
 
 Detta är viktigt för att visa hur privilegier kan styras både i appen och direkt i databasen.
 
@@ -136,13 +136,13 @@ Vi valde PostgreSQL eftersom projektet innehåller:
 - tydliga relationer mellan flera tabeller
 - behov av foreign keys, constraints och transaktioner
 - behov av VIEW, stored procedure, trigger och roller
-- behov av att kunna göra JOINs och sammanställningar på ett tydligt satt
+- behov av att kunna göra JOINs och sammanställningar på ett tydligt sätt
 
 En relationsdatabas passar därför bättre än en NoSQL-lösning i detta scenario.
 
 ## Hur man kör projektet
 
-1. Se till att PostgreSQL ar installerat och att databasen är tillganglig.
+1. Se till att PostgreSQL ar installerat och att databasen är tillgänglig.
 2. Justera vid behov miljo-variablerna `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST` och `DB_PORT`.
 3. Starta appen med Python:
 

@@ -1,7 +1,7 @@
 # Alex&Benjis Pizzeria
 av Alexander Johansson och Benjamin Kullman YH25 VG Projekt
 
-## Projektoversikt
+## Projektöversikt
 
 Detta är ett slutprojekt i kursen Databaser där vi har byggt en pizzeria-applikation med Flask och PostgreSQL.
 Systemet hanterar kunder,  personal, beställningar och produkter, och fokuserar extra mycket på dataintegritet,
@@ -22,7 +22,7 @@ Den senaste versionen av databasen innehåller tre tydliga användarflöden:
 - Kunder kan registrera konto, logga in och uppdatera profil.
 - Kunder kan skapa beställningar och få kvitto via vyn i databasen `OrdersammanFattning`.
 
-### Personalflode
+### Personalflöde
 
 - Flera personal- och adminkonton kan finnas samtidigt.
 - Vanliga anställda loggar in via `/anstallda`.

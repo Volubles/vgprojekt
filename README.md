@@ -109,8 +109,8 @@ Projektet visar säkerhet på tre nivåer:
 
 ### 1. Roller i applikationen
 
-- `admin`: full tillgang till konton, produkter och databaspanel.
-- `anstalld`: begransad tillgang till att uppdatera pizzornas beskrivningar.
+- `admin`: full tillgång till konton, produkter och databaspanel.
+- `anstalld`: begränsad tillgång till att uppdatera pizzornas beskrivningar.
 - `kund`: kan bara hantera sitt eget konto och sina bestallningar.
 
 ### 2. Roller i databasen
